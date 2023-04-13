@@ -16,11 +16,39 @@ app.use(json());
 const uri = process.env.MONGO_URI;
 const client = new MongoClient(uri);
 const db = client.db();
+const participants = db.collection("participants");
+const messages = db.collection("messages");
+
+const SESSION_TIMEOUT = 10_000;
+const CHECK_INTERVAL = 15_000;
+
+async function removeInactiveParticipants() {
+  const now = Date.now();
+  const leastAllowedTimestamp = now - SESSION_TIMEOUT;
+  const query = { lastStatus: { $lt: leastAllowedTimestamp } };
+
+  try {
+    await participants.find(query).forEach(({ name }) => {
+      messages.insertOne({
+        from: name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs(now).format("HH:mm:ss"),
+      });
+    });
+    await participants.deleteMany(query);
+  } catch (err) {
+    console.dir(err);
+  }
+}
+
+setInterval(removeInactiveParticipants, CHECK_INTERVAL);
 
 app.get("/participants", async (req, res) => {
   try {
-    const participants = await db.collection("participants").find().toArray();
-    return res.send(participants);
+    const activeParticipants = await participants.find().toArray();
+    return res.send(activeParticipants);
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -36,9 +64,6 @@ app.post("/participants", async (req, res) => {
   const name = stripHtml(value.name).result;
 
   try {
-    const participants = db.collection("participants");
-    const messages = db.collection("messages");
-
     const existingParticipant = await participants.findOne({ name });
 
     if (existingParticipant) {
