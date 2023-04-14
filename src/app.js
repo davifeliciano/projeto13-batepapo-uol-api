@@ -67,34 +67,40 @@ app.post("/participants", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
-  const { user: name } = req.headers;
-  let limit = req.query.limit;
+  const { user: from } = req.headers;
 
-  if (limit === undefined) {
-    limit = 0;
+  if (from === undefined) {
+    return res.sendStatus(422);
   }
 
-  limit = parseInt(limit);
+  const { limit } = req.query;
+  let parsedLimit = parseInt(limit);
 
-  if (Number.isNaN(limit) || limit < 0) {
+  if (limit === undefined) {
+    parsedLimit = 0;
+  }
+
+  if (Number.isNaN(parsedLimit) || parsedLimit < 0) {
     return res.sendStatus(422);
   }
 
   try {
-    const currentUser = await db.collection("participants").findOne({ name });
+    const currentUser = await db
+      .collection("participants")
+      .findOne({ name: from });
 
     if (!currentUser) {
-      return res.sendStatus(401);
+      return res.sendStatus(422);
     }
 
     const query = {
-      $or: [{ to: { $in: [name, "Todos"] } }, { from: name }],
+      $or: [{ to: { $in: [from, "Todos"] } }, { from }],
     };
 
     const messages = await db
       .collection("messages")
       .find(query)
-      .limit(limit)
+      .limit(parsedLimit)
       .toArray();
 
     return res.send(messages);
@@ -107,24 +113,21 @@ app.get("/messages", async (req, res) => {
 app.post("/messages", async (req, res) => {
   const { user: from } = req.headers;
   const { error, value } = messageSchema.validate(req.body);
-  const { to, text, type } = Object.fromEntries(
-    Object.entries(value).map(([key, value]) => [key, stripHtml(value).result])
-  );
 
   if (error) {
     return res.sendStatus(422);
   }
 
+  const { to, text, type } = Object.fromEntries(
+    Object.entries(value).map(([key, value]) => [key, stripHtml(value).result])
+  );
+
   try {
-    const currentUser = db.collection("participants").find({ name: from });
+    const currentUser = await db
+      .collection("participants")
+      .findOne({ name: from });
 
     if (!currentUser) {
-      return res.sendStatus(401);
-    }
-
-    const messageTarget = db.collection("participants").find({ name: to });
-
-    if (!messageTarget) {
       return res.sendStatus(422);
     }
 
