@@ -14,7 +14,7 @@ const app = express();
 app.use(cors());
 app.use(json());
 
-const uri = process.env.MONGO_URI;
+const uri = process.env.DATABASE_URL;
 const client = new MongoClient(uri);
 const db = client.db();
 
