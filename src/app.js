@@ -6,6 +6,7 @@ import { stripHtml } from "string-strip-html";
 import dayjs from "dayjs";
 
 import participantSchema from "./schemas/participant.js";
+import messageSchema from "./schemas/message.js";
 
 dotenv.config();
 
@@ -78,6 +79,77 @@ app.post("/participants", async (req, res) => {
       type: "status",
       time: dayjs().format("HH:mm:ss"),
     });
+    return res.sendStatus(201);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.get("/messages", async (req, res) => {
+  const { user: name } = req.headers;
+  let limit = req.query.limit;
+
+  if (limit === undefined) {
+    limit = 0;
+  }
+
+  limit = parseInt(limit);
+
+  if (Number.isNaN(limit) || limit < 0) {
+    return res.sendStatus(422);
+  }
+
+  try {
+    const currentUser = await participants.findOne({ name });
+
+    if (!currentUser) {
+      return res.sendStatus(401);
+    }
+
+    const query = {
+      $or: [{ to: { $in: [name, "Todos"] } }, { from: name }],
+    };
+
+    const filteredMessages = await messages.find(query).limit(limit).toArray();
+
+    return res.send(filteredMessages);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+app.post("/messages", async (req, res) => {
+  const { user: from } = req.headers;
+  const { error, value } = messageSchema.validate(req.body);
+  const { to, text, type } = Object.fromEntries(
+    Object.entries(value).map(([key, value]) => [key, stripHtml(value).result])
+  );
+
+  if (error) {
+    return res.sendStatus(422);
+  }
+
+  try {
+    const currentUser = participants.find({ name: from });
+
+    if (!currentUser) {
+      return res.sendStatus(401);
+    }
+
+    const messageTarget = participants.find({ name: to });
+
+    if (!messageTarget) {
+      return res.sendStatus(422);
+    }
+
+    await messages.insertOne({
+      from,
+      to,
+      text,
+      type,
+      time: dayjs().format("HH:mm:ss"),
+    });
+
     return res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err.message);
