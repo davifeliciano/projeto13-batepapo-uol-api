@@ -21,33 +21,6 @@ const db = client.db();
 const SESSION_TIMEOUT = 10_000;
 const CHECK_INTERVAL = 15_000;
 
-async function removeInactiveParticipants() {
-  const now = Date.now();
-  const leastAllowedTimestamp = now - SESSION_TIMEOUT;
-  const query = { lastStatus: { $lt: leastAllowedTimestamp } };
-
-  try {
-    await db
-      .collection("participants")
-      .find(query)
-      .forEach(({ name }) => {
-        db.collection("messages").insertOne({
-          from: name,
-          to: "Todos",
-          text: "sai da sala...",
-          type: "status",
-          time: dayjs(now).format("HH:mm:ss"),
-        });
-      });
-
-    await db.collection("participants").deleteMany(query);
-  } catch (err) {
-    console.dir(err);
-  }
-}
-
-setInterval(removeInactiveParticipants, CHECK_INTERVAL);
-
 app.get("/participants", async (req, res) => {
   try {
     const participants = await db.collection("participants").find().toArray();
@@ -174,3 +147,35 @@ const port = 5000;
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
+
+async function removeInactiveParticipants() {
+  const now = Date.now();
+  const leastAllowedTimestamp = now - SESSION_TIMEOUT;
+  const query = { lastStatus: { $lt: leastAllowedTimestamp } };
+
+  try {
+    const inactiveParticipants = await db
+      .collection("participants")
+      .find(query)
+      .toArray();
+
+    if (inactiveParticipants.length === 0) {
+      return;
+    }
+
+    const messages = inactiveParticipants.map(({ name }) => ({
+      from: name,
+      to: "Todos",
+      text: "sai da sala...",
+      type: "status",
+      time: dayjs(now).format("HH:mm:ss"),
+    }));
+
+    await db.collection("messages").insertMany(messages);
+    await db.collection("participants").deleteMany(query);
+  } catch (err) {
+    console.dir(err);
+  }
+}
+
+setInterval(removeInactiveParticipants, CHECK_INTERVAL);
