@@ -2,10 +2,11 @@
   "name": "projeto13-batepapo-uol-api",
   "version": "1.0.0",
   "description": "API com funcionalidades básicas de um serviço de bate-papo online desenvolvida em Express para fins didáticos",
-  "main": "src/app.js",
+  "main": "./src/app.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon src/app.js",
+    "start": "node ./src/app.js",
+    "dev": "nodemon ./src/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
