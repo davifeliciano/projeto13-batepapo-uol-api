@@ -4,6 +4,7 @@ import cors from "cors";
 import { MongoClient } from "mongodb";
 import { stripHtml } from "string-strip-html";
 import dayjs from "dayjs";
+import Joi from "joi";
 
 import participantSchema from "./schemas/participant.js";
 import messageSchema from "./schemas/message.js";
@@ -74,14 +75,16 @@ app.get("/messages", async (req, res) => {
   }
 
   const { limit } = req.query;
-  let parsedLimit = parseInt(limit);
+  const limitSchema = Joi.number().integer().greater(0);
+  const { error, value } = limitSchema.validate(req.query.limit);
+  let parsedLimit = value;
+
+  if (error) {
+    return res.sendStatus(422);
+  }
 
   if (limit === undefined) {
     parsedLimit = 0;
-  }
-
-  if (Number.isNaN(parsedLimit) || parsedLimit < 0) {
-    return res.sendStatus(422);
   }
 
   try {
