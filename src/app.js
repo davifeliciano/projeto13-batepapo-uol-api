@@ -178,6 +178,48 @@ app.delete("/messages/:id", async (req, res) => {
   }
 });
 
+app.put("/messages/:id", async (req, res) => {
+  const { id } = req.params;
+  const { user: from } = req.headers;
+
+  if (from === undefined) {
+    return res.sendStatus(422);
+  }
+
+  const { error, value } = messageSchema.validate(req.body);
+
+  if (error) {
+    return res.sendStatus(422);
+  }
+
+  const updatedMessage = Object.fromEntries(
+    Object.entries(value).map(([key, value]) => [key, stripHtml(value).result])
+  );
+
+  try {
+    const message = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!message) {
+      return res.sendStatus(404);
+    }
+
+    if (from !== message.from) {
+      return res.sendStatus(401);
+    }
+
+    await db
+      .collection("messages")
+      .updateOne({ _id: new ObjectId(id) }, { $set: updatedMessage });
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.dir(err);
+    return res.status(500).send(err.message);
+  }
+});
+
 app.post("/status", async (req, res) => {
   const { user: name } = req.headers;
   const now = Date.now();
