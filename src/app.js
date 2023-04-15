@@ -146,6 +146,30 @@ app.post("/messages", async (req, res) => {
   }
 });
 
+app.post("/status", async (req, res) => {
+  const { user: name } = req.headers;
+  const now = Date.now();
+
+  if (name === undefined) {
+    return res.sendStatus(404);
+  }
+
+  try {
+    const { matchedCount } = await db
+      .collection("participants")
+      .updateOne({ name }, { $set: { lastStatus: now } });
+
+    if (matchedCount === 0) {
+      return res.sendStatus(404);
+    }
+
+    return res.sendStatus(200);
+  } catch (err) {
+    console.dir(err);
+    return res.status(500).send(err.message);
+  }
+});
+
 const port = 5000;
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
